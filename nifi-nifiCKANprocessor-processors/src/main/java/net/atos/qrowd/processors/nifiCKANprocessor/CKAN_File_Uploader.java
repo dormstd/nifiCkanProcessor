@@ -18,12 +18,7 @@
 package net.atos.qrowd.processors.nifiCKANprocessor;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.nifi.annotation.behavior.ReadsAttribute;
-import org.apache.nifi.annotation.behavior.ReadsAttributes;
-import org.apache.nifi.annotation.behavior.WritesAttribute;
-import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.AllowableValue;
@@ -42,11 +37,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 
-@Tags({"ckan"})
-@CapabilityDescription("Nifi Processor that will upload the specified file to CKAN through its API")
-@SeeAlso({})
-@ReadsAttributes({@ReadsAttribute(attribute="", description="")})
-@WritesAttributes({@WritesAttribute(attribute="", description="")})
+@Tags({"ckan","web service","request","files","local"})
+@CapabilityDescription("Nifi Processor that will upload the specified file to CKAN through its API, it will create the organization and package if needed.")
 public class CKAN_File_Uploader extends AbstractProcessor {
 
     private static final AllowableValue COMPLETION_NONE = new AllowableValue("None", "None", "Leave the file as-is");
