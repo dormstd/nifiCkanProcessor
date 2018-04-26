@@ -83,6 +83,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
             .description("Api Key to be used to interact with CKAN")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .required(true)
+            .sensitive(true)
             .build();
     private static final PropertyDescriptor organization_id = new PropertyDescriptor
             .Builder().name("organization_id")
@@ -323,7 +324,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         }
     }
 
-    // Auxiliary methods
+    // Auxiliary methods got from fetch files processor
     private void move(final File source, final File target, final boolean overwrite) throws IOException {
         final File targetDirectory = target.getParentFile();
 
