@@ -52,7 +52,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
     private static final AllowableValue CONFLICT_RENAME = new AllowableValue("Rename", "Rename", "The existing destination file should remain intact. The newly ingested file should be moved to the "
             + "destination directory but be renamed to a random filename");
 
-    //ToDo: Add package name property => if this is not empty -> use the value as package name, otherwise use filename as package id.
+
     private static final PropertyDescriptor CKAN_url = new PropertyDescriptor
             .Builder().name("CKAN_url")
             .displayName("CKAN Url")
@@ -82,6 +82,14 @@ public class CKAN_File_Uploader extends AbstractProcessor {
             .displayName("Organization id to add the file to")
             .description("Organization id to add the package to, or create if necessary. Must contain only alphanumeric characters.")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
+            .required(true)
+            .build();
+    private static final PropertyDescriptor package_name = new PropertyDescriptor
+            .Builder().name("package_name")
+            .displayName("Name of the package to add the file to")
+            .description("Name of the package to add the package to, or create if necessary. Must contain only alphanumeric characters. In case this is empty, the name of the file will be used.")
+            .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
             .required(true)
             .build();
     private static final PropertyDescriptor COMPLETION_STRATEGY = new PropertyDescriptor.Builder()
@@ -141,6 +149,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         descriptors.add(COMPLETION_STRATEGY);
         descriptors.add(MOVE_DESTINATION_DIR);
         descriptors.add(CONFLICT_STRATEGY);
+        descriptors.add(package_name);
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
@@ -172,13 +181,20 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         //This is the way to get the value of a property
         String url = context.getProperty(CKAN_url).getValue();
         final String filepath = context.getProperty(file_path).evaluateAttributeExpressions(flowFile).getValue();
+        final File file = new File(filepath);
         final String apiKey = context.getProperty(api_key).getValue();
+
+        //If the property package_name is not filled, then use the filename as package name
+        String packagename = context.getProperty(package_name).getValue();
+        if(packagename.isEmpty())
+        {
+            packagename=getFileName(file);
+        }
         final String organizationId = context.getProperty(organization_id).getValue();
 
         if (flowFile == null) {
             return;
         }
-        final File file = new File(filepath);
 
         // Verify that file system is reachable and file exists
         Path filePath = file.toPath();
@@ -244,7 +260,8 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         // - Upload the file to CKAN, with it's filename as ID
         // -- In case of any exception in the process, send the flowfile to FAILURE.
         // *********************
-        CKAN_API_Handler ckan_api_handler = new CKAN_API_Handler(url, apiKey, getFileName(file), organizationId);
+
+        CKAN_API_Handler ckan_api_handler = new CKAN_API_Handler(url, apiKey, packagename, organizationId);
         try {
             if (!ckan_api_handler.organizationExists()) {
                 ckan_api_handler.createOrganization();
