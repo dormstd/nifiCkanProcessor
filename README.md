@@ -30,6 +30,8 @@ The processor has 7 properties to be filled before running:
 * **file_path**: Local path of the file to be uploaded to CKAN
 * **api_key**: Personal API-Key provided by CKAN
 * **organization_id**: Name of the organization to upload the file to, or create if it does not exists.
+* **package_name**: Name for the creating of the package. When empty, the name of the file will be used. *(optional)*
+* **package_description**: Description of the package *(optional)*
 * **COMPLETION_STRATEGY**: What to do with the file after it is processed - Nothing, Move or Delete.
 * **MOVE_DESTINATION_DIR**:(If *COMPLETION_STRATEGY* is set to Move) Path where the file will be moved to after processing
 * **CONFLICT_STRATEGY**: (If *COMPLETION_STRATEGY* is set to Move) What to do if the destination file already exists - Rename, Replace, Keep or Fail.
