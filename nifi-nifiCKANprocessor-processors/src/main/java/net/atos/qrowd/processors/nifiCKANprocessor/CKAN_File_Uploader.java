@@ -82,15 +82,22 @@ public class CKAN_File_Uploader extends AbstractProcessor {
             .displayName("Organization id to add the file to")
             .description("Organization id to add the package to, or create if necessary. Must contain only alphanumeric characters.")
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
             .required(true)
             .build();
     private static final PropertyDescriptor package_name = new PropertyDescriptor
             .Builder().name("package_name")
             .displayName("Name of the package to add the file to")
             .description("Name of the package to add the package to, or create if necessary. Must contain only alphanumeric characters. In case this is empty, the name of the file will be used.")
-            .addValidator(StandardValidators.CHARACTER_SET_VALIDATOR)
-            .required(true)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .required(false)
+            .build();
+    private static final PropertyDescriptor package_description = new PropertyDescriptor
+            .Builder().name("package_description")
+            .displayName("Description of the package to add the file to")
+            .description("Description of the package to add the package to.")
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .expressionLanguageSupported(true)
+            .required(false)
             .build();
     private static final PropertyDescriptor COMPLETION_STRATEGY = new PropertyDescriptor.Builder()
             .name("Completion Strategy")
@@ -146,10 +153,12 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         descriptors.add(file_path);
         descriptors.add(api_key);
         descriptors.add(organization_id);
+        descriptors.add(package_name);
+        descriptors.add(package_description);
         descriptors.add(COMPLETION_STRATEGY);
         descriptors.add(MOVE_DESTINATION_DIR);
         descriptors.add(CONFLICT_STRATEGY);
-        descriptors.add(package_name);
+
         this.descriptors = Collections.unmodifiableList(descriptors);
 
         final Set<Relationship> relationships = new HashSet<>();
@@ -183,12 +192,13 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         final String filepath = context.getProperty(file_path).evaluateAttributeExpressions(flowFile).getValue();
         final File file = new File(filepath);
         final String apiKey = context.getProperty(api_key).getValue();
+        final String packageDescription = context.getProperty(package_description).evaluateAttributeExpressions(flowFile).getValue();
 
         //If the property package_name is not filled, then use the filename as package name
-        String packagename = context.getProperty(package_name).getValue();
-        if(packagename.isEmpty())
+        String filename = context.getProperty(package_name).getValue();
+        if(filename.isEmpty())
         {
-            packagename=getFileName(file);
+            filename=getFileName(file);
         }
         final String organizationId = context.getProperty(organization_id).getValue();
 
@@ -253,7 +263,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         //  *******************
         //   Main logic of the CKAN uploader
         // - Create the CKAN API Handler
-        // - Check that the targete organization exists in CKAN
+        // - Check that the target organization exists in CKAN
         //      - If it doesn't, create it
         // - Check if the package exists in CKAN
         //      - If it doesn't, create it
@@ -261,7 +271,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         // -- In case of any exception in the process, send the flowfile to FAILURE.
         // *********************
 
-        CKAN_API_Handler ckan_api_handler = new CKAN_API_Handler(url, apiKey, packagename, organizationId);
+        CKAN_API_Handler ckan_api_handler = new CKAN_API_Handler(url, apiKey, filename, organizationId, packageDescription);
         try {
             if (!ckan_api_handler.organizationExists()) {
                 ckan_api_handler.createOrganization();

@@ -42,14 +42,19 @@ public class CKAN_API_Handler {
     private String HOST;
     private String api_key;
     private String package_id;
+    private String filename;
     private String organization_id;
+    private String package_description;
     private CloseableHttpClient httpclient;
 
-    CKAN_API_Handler(String HOST, String api_key, String id_package, String organization_id) {
+    CKAN_API_Handler(String HOST, String api_key, String filename, String organization_id, String package_description) {
         this.HOST = HOST;
         this.api_key = api_key;
-        this.package_id = id_package.toLowerCase();
+        this.package_id = filename.toLowerCase();
+        this.filename = filename;
+        this.package_description = package_description;
         this.organization_id = organization_id.toLowerCase();
+
         this.httpclient = HttpClientBuilder.create().build();
     }
 
@@ -100,8 +105,8 @@ public class CKAN_API_Handler {
 
         HttpEntity reqEntity = MultipartEntityBuilder.create()
                 .addPart("name",new StringBody(package_id,ContentType.TEXT_PLAIN))
-                .addPart("title",new StringBody(package_id,ContentType.TEXT_PLAIN))
                 .addPart("owner_org",new StringBody(organization_id,ContentType.TEXT_PLAIN))
+                .addPart("notes",new StringBody(package_description,ContentType.TEXT_PLAIN))
                 //Package created private by default
                 .addPart("private",new StringBody("true",ContentType.TEXT_PLAIN))
                 .build();
@@ -218,16 +223,12 @@ public class CKAN_API_Handler {
         ContentBody cbFile = new FileBody(file, ContentType.TEXT_HTML);
         HttpEntity reqEntity = MultipartEntityBuilder.create()
                 .addPart("file", cbFile)
-                .addPart("key", new StringBody(path+date,ContentType.TEXT_PLAIN))
+                .addPart("key", new StringBody(file.getName().split("\\.")[0],ContentType.TEXT_PLAIN))
+                .addPart("name", new StringBody(file.getName(),ContentType.TEXT_PLAIN))
                 .addPart("url",new StringBody("testURL",ContentType.TEXT_PLAIN))
                 .addPart("package_id",new StringBody(package_id,ContentType.TEXT_PLAIN))
                 .addPart("upload",cbFile)
-                .addPart("comment",new StringBody("comments",ContentType.TEXT_PLAIN))
-                .addPart("notes", new StringBody("notes",ContentType.TEXT_PLAIN))
-                .addPart("author",new StringBody("AuthorName",ContentType.TEXT_PLAIN))
-                .addPart("author_email",new StringBody("AuthorEmail",ContentType.TEXT_PLAIN))
-                .addPart("title",new StringBody("title",ContentType.TEXT_PLAIN))
-                .addPart("description",new StringBody(path+date,ContentType.TEXT_PLAIN))
+                .addPart("description",new StringBody(file.getName()+" created on: "+date,ContentType.TEXT_PLAIN))
                 .build();
 
         postRequest = new HttpPost(HOST+"/api/action/resource_create");
