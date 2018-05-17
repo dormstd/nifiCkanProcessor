@@ -23,6 +23,7 @@ import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.components.Validator;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.logging.LogLevel;
 import org.apache.nifi.processor.*;
@@ -51,6 +52,9 @@ public class CKAN_File_Uploader extends AbstractProcessor {
     private static final AllowableValue CONFLICT_FAIL = new AllowableValue("Fail", "Fail", "The existing destination file should remain intact and the incoming FlowFile should be routed to failure");
     private static final AllowableValue CONFLICT_RENAME = new AllowableValue("Rename", "Rename", "The existing destination file should remain intact. The newly ingested file should be moved to the "
             + "destination directory but be renamed to a random filename");
+
+    private static final AllowableValue PRIVATE_TRUE = new AllowableValue("True", "Private", "Marks the package as private");
+    private static final AllowableValue PRIVATE_FALSE = new AllowableValue("False", "Public", "Marks the package as public");
 
 
     private static final PropertyDescriptor CKAN_url = new PropertyDescriptor
@@ -88,7 +92,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
             .Builder().name("package_name")
             .displayName("Name of the package to add the file to")
             .description("Name of the package to add the package to, or create if necessary. Must contain only alphanumeric characters. In case this is empty, the name of the file will be used.")
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .addValidator(Validator.VALID)
             .required(false)
             .build();
     private static final PropertyDescriptor package_description = new PropertyDescriptor
@@ -98,6 +102,14 @@ public class CKAN_File_Uploader extends AbstractProcessor {
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .expressionLanguageSupported(true)
             .required(false)
+            .build();
+    private static final PropertyDescriptor package_private = new PropertyDescriptor.Builder()
+            .name("Package visibility")
+            .description("Select if the package to be created will be marked as private or public")
+            .expressionLanguageSupported(false)
+            .allowableValues(PRIVATE_TRUE, PRIVATE_FALSE)
+            .defaultValue(PRIVATE_TRUE.getValue())
+            .required(true)
             .build();
     private static final PropertyDescriptor COMPLETION_STRATEGY = new PropertyDescriptor.Builder()
             .name("Completion Strategy")
@@ -155,6 +167,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         descriptors.add(organization_id);
         descriptors.add(package_name);
         descriptors.add(package_description);
+        descriptors.add(package_private);
         descriptors.add(COMPLETION_STRATEGY);
         descriptors.add(MOVE_DESTINATION_DIR);
         descriptors.add(CONFLICT_STRATEGY);
@@ -193,10 +206,18 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         final File file = new File(filepath);
         final String apiKey = context.getProperty(api_key).getValue();
         final String packageDescription = context.getProperty(package_description).evaluateAttributeExpressions(flowFile).getValue();
+        final Boolean packagePrivate;
+        packagePrivate = context.getProperty(package_private).getValue().equals("True");
 
-        //If the property package_name is not filled, then use the filename as package name
-        String filename = context.getProperty(package_name).getValue();
-        if(filename.isEmpty())
+        //If the property package_name is not filled, then use the filename (without extension) as package name
+        //ToDo: Fix an error, the processos throws null pointer when package_name property is empty
+        String filename = null;
+        if(context.getProperty(package_name).isSet())
+        {
+            filename =context.getProperty(package_name).getValue();
+        }
+        //Check if the property is filled with spaces, empty, or null to use the file name as filename
+        if(filename == null || filename.isEmpty() || filename.trim().length()==0)
         {
             filename=getFileName(file);
         }
@@ -271,7 +292,7 @@ public class CKAN_File_Uploader extends AbstractProcessor {
         // -- In case of any exception in the process, send the flowfile to FAILURE.
         // *********************
 
-        CKAN_API_Handler ckan_api_handler = new CKAN_API_Handler(url, apiKey, filename, organizationId, packageDescription);
+        CKAN_API_Handler ckan_api_handler = new CKAN_API_Handler(url, apiKey, filename, organizationId, packageDescription, packagePrivate);
         try {
             if (!ckan_api_handler.organizationExists()) {
                 ckan_api_handler.createOrganization();
@@ -279,9 +300,13 @@ public class CKAN_File_Uploader extends AbstractProcessor {
             if (!ckan_api_handler.packageExists()) {
                 ckan_api_handler.createPackage();
             }
-            ckan_api_handler.uploadFile(file.getAbsolutePath());
-            session.transfer(flowFile, REL_SUCCESS);
-            ckan_api_handler.close();
+            if(ckan_api_handler.createOrUpdateResource(file.getAbsolutePath())) {
+                session.transfer(flowFile, REL_SUCCESS);
+                ckan_api_handler.close();
+            }else
+            {
+                session.transfer(session.penalize(flowFile), REL_FAILURE);
+            }
         }catch(IOException ioe)
         {
             getLogger().log(LogLevel.ERROR, "Error while uploading file {} to CKAN {}: Organization {}.",
